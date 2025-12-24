@@ -664,17 +664,17 @@ class NanoBB_instance {
                 "$": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `Document.querySelector(${lib.valueify(args.getChild(0),mem)})`;
+                    return `document.querySelector(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "$byId": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `Document.getElementById(${lib.valueify(args.getChild(0),mem)})`;
+                    return `document.getElementById(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "$$": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `Document.querySelectorAll(${lib.valueify(args.getChild(0),mem)})`;
+                    return `document.querySelectorAll(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "onEvent": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
