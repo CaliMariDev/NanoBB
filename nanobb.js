@@ -157,6 +157,31 @@ var nanolib = new (class {
 
     }
 
+    downloadTextFile(filename, text) {
+        // 1. Create a Blob object from the text content
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        
+        // 2. Create a temporary anchor element (<a>)
+        const anchor = document.createElement('a');
+        
+        // 3. Set the download attribute to specify the file name
+        anchor.download = filename;
+        
+        // 4. Create an object URL for the Blob and set it as the link's href
+        anchor.href = window.URL.createObjectURL(blob);
+        
+        // 5. Append the anchor to the body (necessary for some browsers to trigger click)
+        anchor.style.display = 'none'; // Hide the element
+        document.body.appendChild(anchor);
+        
+        // 6. Programmatically click the link to trigger the download
+        anchor.click();
+        
+        // 7. Clean up by removing the element and revoking the object URL
+        document.body.removeChild(anchor);
+        window.URL.revokeObjectURL(anchor.href); // Free up memory
+    }
+
     parseAST(code){
         let ast = this.tokenize(code);
         //Convert Number Symbols Into Raw Numbers
@@ -678,11 +703,11 @@ class NanoBB_instance {
                 }},
                 "alert":{native: true, fn: (lib,args,mem)=>{
                     if(args.size !== 1){throw lib.err("Alert","Invalid Arguments");}
-                    return `alert(${lib.valueify(args.getChild(1),mem)})`;
+                    return `alert(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "print":{native: true, fn: (lib,args,mem)=>{
                     if(args.size !== 1){throw lib.err("print","Invalid Arguments");}
-                    return `console.log(${lib.valueify(args.getChild(1),mem)})`;
+                    return `console.log(${lib.valueify(args.getChild(0),mem)})`;
                 }},
             };
         }
@@ -694,11 +719,15 @@ class NanoBB_instance {
                 this.mem = {...this.mem,...flags.builtin.mem};
             }
         }
-        this.code = `(async (io)=>{'use strict'; io=io??(()=>{});let mem={${premem.join(",")}};${this._compile(this.ast,"run",this.mem)}${this.getRawRef("main",this.mem)}(mem);${this.isRef("update",this.mem)?`setInterval(${this.getRawRef("update",this.mem)},1);`:""}})`;
+        this.code = `(async (io)=>{'use strict';io=io??(()=>{});let mem={${premem.join(",")}};${this._compile(this.ast,"run",this.mem)}${this.getRawRef("main",this.mem)}(mem);${this.isRef("update",this.mem)?`setInterval(${this.getRawRef("update",this.mem)},1);`:""}})`;
         if(!this.isRef("main",this.mem)){
             throw this.err("Compile","Missing Program Enterance 'main'");
         }
-        return this.exec;
+        return this;
+    }
+
+    downloadExec(name){
+        nanolib.downloadTextFile(`${name??"nanobb_compiled"}.js`,`${this.code}();`);
     }
 
     async exec(flags){
