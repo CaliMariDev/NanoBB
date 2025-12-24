@@ -1,5 +1,6 @@
 # NanoBB (Nano BeepBoop)
 NanoBB is a dynamically typed, javascript transpiled, easily-embeddable, web-based programming language. It is designed with an intuitive DOM API in mind and a safe mode to allow for people to program from the browser without destroying the page!
+
 ![NanoBB Logo](/NanoBB-Logo.png)
 ## How To Use?
 First, make sure you include the "nanobb.js" file in your page directory and run it in the header as follows:
