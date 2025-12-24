@@ -7,7 +7,7 @@ First, make sure you include the "nanobb.js" file in your page directory and run
 ```html
 <script src="NanoBB.js"></script>
 ```
-Next you can compile code by making a new instance. It compiles automatically the string you pass into the constructor. You can also recompile with the "compile" function. You also can pass an "io" parameter which is just a function which can be accessed and called by the code via the "io_req" function.
+Next you can compile code by making a new instance. It automatically compiles the string you pass into the constructor. You can also recompile with the "compile" function. You also can pass an "io" parameter which is just a function which can be accessed and called by the code via the "io_req" function.
 ```js
 let inst = new NanoBB_instance("(= main []{})",()=>{},{esoteric: true});
 // You can compile manually with "inst.compile();"
