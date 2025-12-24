@@ -337,9 +337,11 @@ var nanolib = new (class {
 })();
 
 class NanoBB_instance {
-    constructor(code, io){
+    constructor(code, io, flags){
         this.io = io ?? (()=>{});
-        this.compile(code);
+        if(code){
+            this.compile(code, flags);
+        }
     }
 
     err(loc,info,dat){
@@ -496,10 +498,6 @@ class NanoBB_instance {
                 //Terenary Statement
                 if(args.size !== 3){throw lib.err("Terenary","Invalid Arguments");}
                 return `((${lib.valueify(args.getChild(0),mem)})?(${lib.valueify(args.getChild(1),mem)}):(${lib.valueify(args.getChild(2),mem)}))`;
-            }},
-            "alert":{native: true, fn: (lib,args,mem)=>{
-                if(args.size !== 1){throw lib.err("Alert","Invalid Arguments");}
-                return `alert(${lib.valueify(args.getChild(1),mem)})`;
             }},
             "io_req":{native: true, fn: (lib,args,mem)=>{
                 if(args.size < 1){throw lib.err("IO Request","Invalid Arguments");}
@@ -678,6 +676,14 @@ class NanoBB_instance {
                     if(args.size !== 1){throw lib.err("Unsafe Eval","Invalid Arguments");}
                     return `${args.getChild(0).val??""}`;
                 }},
+                "alert":{native: true, fn: (lib,args,mem)=>{
+                    if(args.size !== 1){throw lib.err("Alert","Invalid Arguments");}
+                    return `alert(${lib.valueify(args.getChild(1),mem)})`;
+                }},
+                "print":{native: true, fn: (lib,args,mem)=>{
+                    if(args.size !== 1){throw lib.err("print","Invalid Arguments");}
+                    return `console.log(${lib.valueify(args.getChild(1),mem)})`;
+                }},
             };
         }
         if(flags.builtin){
@@ -695,12 +701,16 @@ class NanoBB_instance {
         return this.exec;
     }
 
-    async exec(){
-        this.io(`${this.code}\n`);
+    async exec(flags){
+        flags = flags ?? {};
+        //this.io(`${this.code}\n`);
         try {
             return await (eval(this.code)(this.io));
         }catch(err){
-            alert(err);
+            if(flags.alert){
+                alert(err);
+            }
+            return {isErr: true, err};
         }
     }
 }
