@@ -183,7 +183,7 @@ var nanolib = new (class {
     }
 
     parseAST(code){
-        let ast = this.tokenize(code);
+        let ast = this.tokenize(code.split("\n").filter(x=>x.trim().slice(0,2)!="//").join("\n"));
         //Convert Number Symbols Into Raw Numbers
         ast.recurse((x)=>{
             if(x.type == tokType.sym){
@@ -197,7 +197,7 @@ var nanolib = new (class {
         ast.recurse((x)=>{
             if(x.hasBody){
                 x.forEach((self,e,id)=>{
-                    if(e.type == tokType.code && self.getChild(id-1).type == tokType.arr){
+                    if(e.type == tokType.code && self.getChild(id-1).type == tokType.call){
                         e.val = self.pop(id-1);
                         e.setType(tokType.func);
                     }
@@ -438,6 +438,11 @@ class NanoBB_instance {
         let args = nd.children.slice(1,nd.children.length);
         //Find The Function
         switch(cnd.type){
+            case(tokType.code):
+                if(nd.size != 1){
+                    throw this.err("Raw Code Call","Does Not Include Further Arguments");
+                }
+                return this._compile(cnd,"run",mem);
             case(tokType.call):
                 fn = `(${this.valueify(cnd,mem)})`;
                 break;
@@ -447,6 +452,8 @@ class NanoBB_instance {
                     throw this.err("Function Call","Invalid Argument Length");
                 }
                 if(ref.native){
+                    if(ref.enforcecol && isArg){ throw this.err("Function Call","Function Cannot Be Passed As Value Argument"); }
+                    if(ref.noautocol){ isArg = true; }
                     return `${ref.fn(this,new astToken(tokType.group,null,...args),mem)??""}${isArg?"":";"}`;
                 }else if(ref.literal != undefined){
                     fn = ref.literal;
@@ -492,11 +499,13 @@ class NanoBB_instance {
     }
 
     compile(rawcode,flags){
+        let premem = ["rand:(a,b)=>{return (Math.random()*(Math.abs(a-b)+1))+a;}"];
         flags = flags??{};
         this.rawcode = rawcode;
         this.mem = {
             "true": {literal: "true"},
             "false": {literal: "false"},
+            "nil": {literal: "undefined"},
             "builtin_mem": {literal: "mem"},
             "builtin_io": {literal: "io"},
             "pass": {native: true, fn: (lib,args,mem)=>{
@@ -504,23 +513,28 @@ class NanoBB_instance {
                 if(args.size !== 0){throw lib.err("Pass","Invalid Arguments");}
                 return "";
             }},
+            "enum": {native: true, fn: (lib,args,mem)=>{
+                //Define Enums
+                if(!args.checkAllSpecs({type: tokType.sym})){throw lib.err("Enum Definition","Invalid Definition Arguments");}
+                return args.children.map(x=>`${lib.valueify(x,mem)}=Symbol()`).join(";");
+            }, enforcecol: true},
             "=": {native: true, fn: (lib,args,mem)=>{
                 //Define Variable
                 if(args.size !== 2){throw lib.err("Definition","Invalid Definition Arguments");}
                 return `${lib.valueify(args.getChild(0),mem,{strictType: tokType.sym})}=${lib.valueify(args.getChild(1),mem)}`;
-            }},
+            }, enforcecol: true},
             ".=": {native: true, fn: (lib,args,mem)=>{
                 //Define Variable
                 if(args.size !== 3){throw lib.err("Definition","Invalid Definition Arguments");}
                 return `${lib.valueify(args.getChild(0),mem)}[${lib.valueify(args.getChild(1),mem)}]=${lib.valueify(args.getChild(2),mem)}`;
-            }},
+            }, enforcecol: true},
             "if": {native: true, fn: (lib,args,mem)=>{
                 //If Statement
-                if(args.size !== 2 && args.size !== 3){throw lib.err("If","Invalid Arguments");}
-                return `if(${lib.valueify(args.getChild(0),mem)}){${lib._compile(args.getChild(1),mem)}}${args.size==3?`else{${lib._compile(args.getChild(2),mem)}}`:""}`;
-            }},
+                if(args.size !== 2 && args.size !== 3){throw lib.err("If Statement","Invalid Arguments");}
+                return `if(${lib.valueify(args.getChild(0),mem)}){${lib.valueify(args.getChild(1),mem,{strictType: tokType.call})}}${args.getChild(2).type != tokType.nil?`else{${lib.valueify(args.getChild(2),mem,{strictType: tokType.call})}}`:""}`;
+            }, enforcecol: true},
             "?": {native: true, fn: (lib,args,mem)=>{
-                //Terenary Statement
+                //Terenary Operation
                 if(args.size !== 3){throw lib.err("Terenary","Invalid Arguments");}
                 return `((${lib.valueify(args.getChild(0),mem)})?(${lib.valueify(args.getChild(1),mem)}):(${lib.valueify(args.getChild(2),mem)}))`;
             }},
@@ -535,7 +549,7 @@ class NanoBB_instance {
             "return":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 1){throw lib.err("Return","Invalid Arguments");}
                 return `return(${lib.valueify(args.getChild(0),mem)})`;
-            }},
+            }, enforcecol: true},
             "str+":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 2){throw lib.err("Concat","Invalid Arguments");}
                 return `String(${lib.valueify(args.getChild(0),mem)})+String(${lib.valueify(args.getChild(1),mem)})`;
@@ -551,6 +565,14 @@ class NanoBB_instance {
             "not":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 1){throw lib.err("Comparison","Invalid Arguments");}
                 return `(!${lib.valueify(args.getChild(0),mem)})`;
+            }},
+            "rand_int":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 2){throw lib.err("Random Int","Invalid Arguments");}
+                return `BigInt(Math.floor(mem.rand(${lib.valueify(args.getChild(0),mem)},${lib.valueify(args.getChild(1),mem)})))`;
+            }},
+            "rand":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 2){throw lib.err("Random","Invalid Arguments");}
+                return `mem.rand(${lib.valueify(args.getChild(0),mem)},${lib.valueify(args.getChild(1),mem)})`;
             }},
             "<=":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 2){throw lib.err("Comparison","Invalid Arguments");}
@@ -575,6 +597,22 @@ class NanoBB_instance {
             "!=":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 2){throw lib.err("Comparison","Invalid Arguments");}
                 return `(${lib.valueify(args.getChild(0),mem)} !== ${lib.valueify(args.getChild(1),mem)})`;
+            }},
+            "and":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 2){throw lib.err("Comparison","Invalid Arguments");}
+                return `(${lib.valueify(args.getChild(0),mem)} && ${lib.valueify(args.getChild(1),mem)})`;
+            }},
+            "or":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 2){throw lib.err("Comparison","Invalid Arguments");}
+                return `(${lib.valueify(args.getChild(0),mem)} || ${lib.valueify(args.getChild(1),mem)})`;
+            }},
+            "floor":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 1){throw lib.err("Math","Invalid Arguments");}
+                return `BigInt(Math.floor(${lib.valueify(args.getChild(0),mem)}))`;
+            }},
+            "ceil":{native: true, fn: (lib,args,mem)=>{
+                if(args.size !== 1){throw lib.err("Math","Invalid Arguments");}
+                return `BigInt(Math.ceil(${lib.valueify(args.getChild(0),mem)}))`;
             }},
             "i+":{native: true, fn: (lib,args,mem)=>{
                 if(args.size !== 2){throw lib.err("Math","Invalid Arguments");}
@@ -643,7 +681,6 @@ class NanoBB_instance {
             }},
         };
         this.ast = nanolib.parseAST(rawcode);
-        let premem = [];
         if(flags.esoteric){
             //Implement Meme Functions
             premem.push(`get maybe(){return Math.random()<=0.5;},set maybe(x){}`);
@@ -664,17 +701,17 @@ class NanoBB_instance {
                 "$": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `document.querySelector(${lib.valueify(args.getChild(0),mem)})`;
+                    return `Document.querySelector(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "$byId": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `document.getElementById(${lib.valueify(args.getChild(0),mem)})`;
+                    return `Document.getElementById(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "$$": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
                     if(args.size !== 1){throw lib.err("Dom","Invalid Arguments");}
-                    return `document.querySelectorAll(${lib.valueify(args.getChild(0),mem)})`;
+                    return `Document.querySelectorAll(${lib.valueify(args.getChild(0),mem)})`;
                 }},
                 "onEvent": {native: true, fn: (lib,args,mem)=>{
                     //Dom Function
@@ -734,11 +771,12 @@ class NanoBB_instance {
         flags = flags ?? {};
         //this.io(`${this.code}\n`);
         try {
-            return await (eval(this.code)(this.io));
+            return await (eval(this.code)(flags.noio?undefined:this.io));
         }catch(err){
             if(flags.alert){
                 alert(err);
             }
+            if(flags.throw){ throw err; }
             return {isErr: true, err};
         }
     }

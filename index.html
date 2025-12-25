@@ -37,7 +37,15 @@
         textarea {
             height: 60vh;
             flex-basis: 45%;
+        }
+
+        textarea:not(.err):not(.dowrap) {
             text-wrap: nowrap;
+        }
+
+        textarea.err {
+            background-color: #322;
+            color: #f55;
         }
 
         .flexrow {
@@ -45,6 +53,25 @@
             display: flex;
             justify-content: space-evenly;
             align-items: center;
+        }
+
+        .flexcol {
+            margin: 0.5em;
+            display: flex;
+            flex-direction: column;
+            justify-content: left;
+            align-items: center;
+            height: 60vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .flexcol>* {
+            width: 100%;
+        }
+
+        h1 {
+            margin: 0.5em;
         }
 
         p {
@@ -105,41 +132,58 @@
         p.space {
             margin: 0.25em;
         }
+        
+        p.name {
+            color: #556;
+            margin: 0.25em
+        }
     </style>
 </head>
 <body>
+    <h1>NanoBB Editor</h1>
     <section class="flexrow">
-        <textarea id="code" spellcheck="false">(= n [6 7])
-
-(= main []{
- (io_req "Hello World!")
- (io_req (add (. n 0) (. n 1)))
+        <section class="flexrow" style="flex-basis: 90%;">
+            <textarea id="code" spellcheck="false">(= loop (fn i){
+ (if (> i 0) ({
+  (fn i)
+  (loop fn (i- i 1))
+ }))
 })
 
-(= add [x y]{
- (return (str+ x y))
+(= main (){
+ (io_req "Hello World!\n")
+ (loop (i){
+  (io_req (sayRand [6 7]))
+ } (rand_int 0 5))
+})
+
+(= sayRand (a){
+ (return (? maybe (. a 0) (. a 1)))
 })</textarea>
-        <textarea id="out" spellcheck="false" readonly></textarea>
+            <textarea id="out" spellcheck="false" readonly></textarea>
+        </section>
+        <section class="flexcol" style="flex-basis: 15%;">
+            <button onclick="runCode();">Run Code</button>
+            <button onclick="rawCode();">Show Raw</button>
+            <button onclick="downloadCode();">Download </button>
+            <p style="font-size: 1.1em; font-weight: bold;">Compilation Flags</p>
+            <p class="name">Esoteric API</p>
+            <label class="switch">
+                <input class="toggle" id="esomode" type="checkbox" checked/>
+                <span class="slider"></span>
+                <span class="card-side"></span>
+            </label>
+            <p class="space"></p>
+            <p class="name">Safe Mode</p>
+            <label class="switch">
+                <input class="toggle" id="safemode" type="checkbox" />
+                <span class="slider"></span>
+                <span class="card-side"></span>
+            </label>
+        </section>
     </section>
-    <section class="flexrow" style="justify-content: center; margin-bottom: 0px;">
-        <button onclick="runCode();">Run Code</button>
-        <button onclick="downloadCode();">Download Code</button>
-    </section>
-    <section class="flexrow" style="justify-content: center; margin-top: 0px;">
-        <p>Esoteric Mode:</p>
-        <label class="switch">
-            <input class="toggle" id="esomode" type="checkbox" checked/>
-            <span class="slider"></span>
-            <span class="card-side"></span>
-        </label>
-        <p class="space"></p>
-        <p>Safe Mode:</p>
-        <label class="switch">
-            <input class="toggle" id="safemode" type="checkbox" />
-            <span class="slider"></span>
-            <span class="card-side"></span>
-        </label>
-    </section>
+    <p style="margin: 1em;">Latest version NanoBB V0.2.0 - Made By Mari</p>
+    <p style="margin: 1em;"><a href="https://github.com/CaliMariDev/NanoBB">Github</a></p>
     <script>
         var codeDom = document.getElementById("code");
         var outDom = document.getElementById("out");
@@ -151,24 +195,50 @@
             outDom.value += String(x);
         },{esoteric: true});
         
-        function downloadCode(){
-                outDom.value = "Compiling...\n";
-                inst.compile(codeDom.value,{esoteric: toggles.eso.checked,safe: toggles.safe.checked});
-                outDom.value += "Success!\n";
-                inst.downloadExec();
-                outDom.value += "Downloaded";
+        async function downloadCode(){
+                try {
+                    outDom.className = "";
+                    outDom.value = "Compiling...\n";
+                    inst.compile(codeDom.value,{esoteric: toggles.eso.checked,safe: toggles.safe.checked});
+                    outDom.value += "Success!\n";
+                    await inst.exec({noio: true, throw: true});
+                    inst.downloadExec();
+                    outDom.value += "Downloaded";
+                }catch(err){
+                    outDom.className = "err";
+                    outDom.value += `RUNTIME ERR | ${err}`;
+                    //alert(err);
+                }
         }
 
         async function runCode(){
             try {
+                outDom.className = "";
                 outDom.value = "Compiling...\n";
                 inst.compile(codeDom.value,{esoteric: toggles.eso.checked,safe: toggles.safe.checked});
                 outDom.value += "Success!\n\n";
-                await inst.exec({alert: true});
+                await inst.exec({throw: true});
                 outDom.value += "\n\nDone!";
             }catch(err){
-                outDom.value += `${err}\n`;
-                alert(err);
+                outDom.className = "err";
+                outDom.value += `\nRUNTIME ERR | ${err}`;
+                //alert(err);
+            }
+        }
+
+        async function rawCode(){
+            try {
+                outDom.className = "dowrap";
+                outDom.value = "Compiling...\n";
+                inst.compile(codeDom.value,{esoteric: toggles.eso.checked,safe: toggles.safe.checked});
+                outDom.value += "Success!\n\n";
+                outDom.value += `${inst.code}\n`;
+                await inst.exec({noio: true, throw: true});
+                outDom.value += "\n\nDone!";
+            }catch(err){
+                outDom.className = "err";
+                outDom.value += `RUNTIME ERR | ${err}`;
+                //alert(err);
             }
         }
 
