@@ -14,7 +14,7 @@ Next you can compile code by making a new instance. It automatically compiles th
 try {
   // You can compile manually with "inst.compile();"
   // The "esoteric" flag implements joke values into the code
-  let inst = new NanoBB_instance("(= main []{})",()=>{},{esoteric: true});
+  let inst = new NanoBB_instance("(= main (){})",()=>{},{esoteric: true});
 }catch(err){
   // Alert compile error
   alert(err);
